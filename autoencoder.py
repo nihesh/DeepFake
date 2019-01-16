@@ -1,4 +1,5 @@
-__author__ = 'SherlockLiao'
+# Author : Nihesh Anderson
+#		   Harsh Pathak
 
 import torch
 import torchvision
