@@ -1,5 +1,8 @@
-# Author : Nihesh Anderson
-#		   Harsh Pathak
+# File: autoencoder.py
+# Authors:
+# Nihesh Anderson
+# Harsh Pathak
+# Date : Jan 16, 2019
 
 import torch
 import torchvision
@@ -10,74 +13,114 @@ from torchvision import transforms
 from torchvision.utils import save_image
 from torchvision.datasets import MNIST
 import os
+from torchvision import datasets, models, transforms
 import numpy as np
+import cv2
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt 
+import scipy.misc
 
 if not os.path.exists('./dc_img'):
-    os.mkdir('./dc_img')
+	os.mkdir('./dc_img')
+
+if not os.path.exists('./dc_img/train'):
+	os.mkdir('./dc_img/train')
+
+if not os.path.exists('./dc_img/test'):
+	os.mkdir('./dc_img/test')
+
+src  = [ "./data/harsh_train",  "./data/harsh_test"]
 
 
-def to_img(x):
-    x = 0.5 * (x + 1)
-    x = x.clamp(0, 1)
-    x = x.view(x.size(0), 1, 28, 28)
-    return x
-
-
-num_epochs = 100
+num_epochs = 20
 batch_size = 128
 learning_rate = 1e-3
+data_transforms = {
+    'train': transforms.Compose([
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        # transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
+    ]),
+    'test': transforms.Compose([
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        # transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
+    ]),
+}
+data_dir = "./data"
 
-img_transform = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-])
+image_datasets = {}
 
-dataset = MNIST('./data', transform=img_transform, download=True)
-test_data  = MNIST("./testdata", transform=img_transform, download=True, train = False)
-dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-test_data_loader = DataLoader(test_data, batch_size=batch_size, shuffle=True)
+for x in ["train","test"]:
+	
+	img = []
+	folder = data_dir+"/harsh_"+x+"/1"
+	for file in os.listdir(folder):
+		my_img = cv2.imread(folder+"/"+file)
+		# my_img = scipy.misc.imresize(my_img, (120,180,3))
+		my_img = np.rollaxis(my_img,2,0)
+		my_img = my_img.astype(float)
+		img.append(my_img)
+	img = np.asarray(img)
+	image_datasets[x] = img
+
+dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=batch_size,
+                                             shuffle=True, num_workers = 12)
+
+              for x in ['train', 'test']}
+
+dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'test']}
+
+image_datasets = None
 
 BLUR_FILTER_SIZE = 23
 
-class autoencoder(nn.Module):
-    def __init__(self):
-        super(autoencoder, self).__init__()
-        self.conv = nn.Conv2d(1,1,BLUR_FILTER_SIZE, padding=BLUR_FILTER_SIZE//2, bias=False)
-        self.conv.weight = torch.nn.Parameter((torch.ones(BLUR_FILTER_SIZE,BLUR_FILTER_SIZE)*(1/(BLUR_FILTER_SIZE*BLUR_FILTER_SIZE))).expand(self.conv.weight.size()), requires_grad=False)
-        self.encoder = nn.Sequential(
-            self.conv,
-            nn.Conv2d(1, 16, 3, stride=3, padding=1),  # b, 16, 10, 10
-            nn.ReLU(True),
-            nn.MaxPool2d(2, stride=2),  # b, 16, 5, 5
-            nn.Conv2d(16, 8, 3, stride=2, padding=1),  # b, 8, 3, 3
-            nn.ReLU(True),
-            nn.MaxPool2d(2, stride=1)  # b, 8, 2, 2
-        )
-        self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(8, 16, 3, stride=2),  # b, 16, 5, 5
-            nn.ReLU(True),
-            nn.ConvTranspose2d(16, 8, 5, stride=3, padding=1),  # b, 8, 15, 15
-            nn.ReLU(True),
-            nn.ConvTranspose2d(8, 1, 2, stride=2, padding=1),  # b, 1, 28, 28
-            nn.Tanh()
-        )
+def to_img(x):
+    # x = 0.5 * (x + 1)
+    # x = x.clamp(0, 1)
+    x = np.rollaxis(x, 0, 3)
+    return x
 
-    def forward(self, x):
-        x = self.encoder(x)
-        x = self.decoder(x)
-        return x
+class autoencoder(nn.Module):
+	def __init__(self):
+		super(autoencoder, self).__init__()
+		self.blurring = nn.Conv2d(3,3,BLUR_FILTER_SIZE, padding=BLUR_FILTER_SIZE//2, bias=False)
+		self.blurring.weight = torch.nn.Parameter((torch.ones(BLUR_FILTER_SIZE,BLUR_FILTER_SIZE)*(1/(BLUR_FILTER_SIZE*BLUR_FILTER_SIZE))).expand(self.blurring.weight.size()), requires_grad=False)
+		self.encoder = nn.Sequential(
+			self.blurring,                                  # 720 x 480 x 3 => 720 x 480 x 3 - Blur effect
+			nn.Conv2d(3, 16, 3, stride=3, padding=0),       # 720 x 480 x 3 => 240 x 160 x 16
+			nn.ReLU(True),
+			nn.MaxPool2d(2, stride=2),  					# 240 x 160 x 16 => 120 x 80 x 16
+			nn.Conv2d(16, 8, 4, stride=4, padding=0),  		# 120 x 80 x 16 => 30 x 20 x 8
+			nn.ReLU(True),
+			# nn.MaxPool2d(2, stride=1)  # b, 8, 2, 2
+		)
+		self.decoder = nn.Sequential(
+			nn.ConvTranspose2d(8, 16, 4, stride=4),  		# 30 x 20 x 8 => 120 x 80 x 16
+			nn.ReLU(True),
+			nn.ConvTranspose2d(16, 8, 3, stride=3, padding=0),  # 120 x 80 x 16 => 360 x 240 x 8
+			nn.ReLU(True),
+			nn.ConvTranspose2d(8, 3, 2, stride=2, padding=0),  # 360 x 240 x 8 => 720 x 480 x 3
+			nn.Tanh()
+		)
+
+	def forward(self, x):
+		x = self.encoder(x)
+		x = self.decoder(x)
+		return x
 
 class LinearBlur():
-    def __init__(self):
-        self.conv = nn.Conv2d(1,1,BLUR_FILTER_SIZE, padding=BLUR_FILTER_SIZE//2, bias=False)
-        self.conv.weight = torch.nn.Parameter((torch.ones(BLUR_FILTER_SIZE,BLUR_FILTER_SIZE)*(1/(BLUR_FILTER_SIZE*BLUR_FILTER_SIZE))).expand(self.conv.weight.size()), requires_grad=False)
-        self.linear_blur = nn.Sequential(
-            self.conv
-        )
+	def __init__(self):
+		self.conv = nn.Conv2d(3,3,BLUR_FILTER_SIZE, padding=BLUR_FILTER_SIZE//2, bias=False)
+		self.conv.weight = torch.nn.Parameter((torch.ones(BLUR_FILTER_SIZE,BLUR_FILTER_SIZE)*(1/(BLUR_FILTER_SIZE*BLUR_FILTER_SIZE))).expand(self.conv.weight.size()), requires_grad=False)
+		self.linear_blur = nn.Sequential(
+			self.conv
+		)
 
-    def forward(self, x):
-        x = self.linear_blur(x)
-        return x
+	def forward(self, x):
+		x = self.linear_blur(x)
+		return x
 
 
 model = autoencoder().cuda()
@@ -87,38 +130,27 @@ optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate,
                              weight_decay=1e-5)
 
 for epoch in range(num_epochs):
-    for data in dataloader:
-        img, _ = data
-        img = Variable(img).cuda()
-        # ===================forward=====================
-        output = model(img)
-        loss = criterion(output, img)
-        # ===================backward====================
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-    # ===================log========================
-    print('epoch ['+str(epoch+1)+'/'+str(num_epochs)+'], loss:'+str(loss.item()))
-    if epoch % 10 == 0:
-        pic = to_img(output.cpu().data)
-        input_pic = to_img(img.cpu().data)
-        save_image(pic, './dc_img/image_{}.png'.format(epoch))
-        save_image(blur.forward(input_pic), './dc_img/image_{}_input.png'.format(epoch))
-
-    loss_vec = []
-    for data in test_data_loader:
-        img, _ = data
-        img = Variable(img).cuda()
-        output = model(img)
-        loss = criterion(output, img)
-        loss_vec.append(loss.item())
-    
-    print('Test epoch ['+str(epoch+1)+'/'+str(num_epochs)+'], loss:'+str(np.mean(loss_vec)))
-    if epoch % 10 == 0:
-        pic = to_img(output.cpu().data)
-        input_pic = to_img(img.cpu().data)
-        save_image(pic, './dc_img_test/image_{}.png'.format(epoch))
-        save_image(blur.forward(input_pic), './dc_img_test/image_{}_input.png'.format(epoch))
+	for phase in ['train', 'test']:
+		for data in dataloaders[phase]:
+			img = data.float()
+			img = Variable(img).cuda()
+			# ===================forward=====================
+			output = model(img)
+			loss = criterion(output, img)
+			# ===================backward====================
+			if(phase == 'train'):
+				optimizer.zero_grad()
+				loss.backward()
+				optimizer.step()
+			# ===================log=========================
+		print(phase.upper()+" pixels mean: "+str(np.mean(img.cpu().data.numpy()))+" pixels max "+str(np.max(img.cpu().data.numpy())))
+		print(phase.upper() + ' epoch ['+str(epoch+1)+'/'+str(num_epochs)+'], loss:'+str(loss.item()))
+		if epoch % 10 == 0:
+			pic = to_img(output.cpu().data.numpy()[0])
+			input_pic = to_img(img.cpu().data.numpy()[0])
+			print(np.mean(pic), np.mean(input_pic)) # Input mean - 40, output mean - 0.14 (wait for it to learn and reduce input dim)
+			cv2.imwrite('./dc_img/' + phase + '/image_{}.jpg'.format(epoch), pic)
+			cv2.imwrite('./dc_img/' + phase + '/image_{}_input.jpg'.format(epoch), input_pic)
 
 
 torch.save(model.state_dict(), './conv_autoencoder.pth')
