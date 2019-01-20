@@ -20,6 +20,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt 
 import scipy.misc
+import time
 
 if not os.path.exists('./dc_img'):
 	os.mkdir('./dc_img')
@@ -35,7 +36,7 @@ src  = [ "./data/harsh_train",  "./data/harsh_test"]
 
 num_epochs = 20
 batch_size = 128
-learning_rate = 1e-3
+learning_rate = 1e-6
 data_transforms = {
     'train': transforms.Compose([
         transforms.RandomHorizontalFlip(),
@@ -58,7 +59,7 @@ for x in ["train","test"]:
 	folder = data_dir+"/harsh_"+x+"/1"
 	for file in os.listdir(folder):
 		my_img = cv2.imread(folder+"/"+file)
-		# my_img = scipy.misc.imresize(my_img, (120,180,3))
+		my_img = scipy.misc.imresize(my_img, (240,360,3))
 		my_img = np.rollaxis(my_img,2,0)
 		my_img = my_img.astype(float)
 		img.append(my_img)
@@ -89,19 +90,19 @@ class autoencoder(nn.Module):
 		self.blurring.weight = torch.nn.Parameter((torch.ones(BLUR_FILTER_SIZE,BLUR_FILTER_SIZE)*(1/(BLUR_FILTER_SIZE*BLUR_FILTER_SIZE))).expand(self.blurring.weight.size()), requires_grad=False)
 		self.encoder = nn.Sequential(
 			self.blurring,                                  # 720 x 480 x 3 => 720 x 480 x 3 - Blur effect
-			nn.Conv2d(3, 16, 3, stride=3, padding=0),       # 720 x 480 x 3 => 240 x 160 x 16
+			nn.Conv2d(3, 64, 3, stride=3, padding=0),       # 720 x 480 x 3 => 240 x 160 x 16
 			nn.ReLU(True),
 			nn.MaxPool2d(2, stride=2),  					# 240 x 160 x 16 => 120 x 80 x 16
-			nn.Conv2d(16, 8, 4, stride=4, padding=0),  		# 120 x 80 x 16 => 30 x 20 x 8
+			nn.Conv2d(64, 32, 4, stride=4, padding=0),  		# 120 x 80 x 16 => 30 x 20 x 8
 			nn.ReLU(True),
 			# nn.MaxPool2d(2, stride=1)  # b, 8, 2, 2
 		)
 		self.decoder = nn.Sequential(
-			nn.ConvTranspose2d(8, 16, 4, stride=4),  		# 30 x 20 x 8 => 120 x 80 x 16
+			nn.ConvTranspose2d(32, 48, 4, stride=4),  		# 30 x 20 x 8 => 120 x 80 x 16
 			nn.ReLU(True),
-			nn.ConvTranspose2d(16, 8, 3, stride=3, padding=0),  # 120 x 80 x 16 => 360 x 240 x 8
+			nn.ConvTranspose2d(48, 64, 3, stride=3, padding=0),  # 120 x 80 x 16 => 360 x 240 x 8
 			nn.ReLU(True),
-			nn.ConvTranspose2d(8, 3, 2, stride=2, padding=0),  # 360 x 240 x 8 => 720 x 480 x 3
+			nn.ConvTranspose2d(64, 3, 2, stride=2, padding=0),  # 360 x 240 x 8 => 720 x 480 x 3
 			nn.Tanh()
 		)
 
@@ -143,12 +144,15 @@ for epoch in range(num_epochs):
 				loss.backward()
 				optimizer.step()
 			# ===================log=========================
-		print(phase.upper()+" pixels mean: "+str(np.mean(img.cpu().data.numpy()))+" pixels max "+str(np.max(img.cpu().data.numpy())))
-		print(phase.upper() + ' epoch ['+str(epoch+1)+'/'+str(num_epochs)+'], loss:'+str(loss.item()))
+		
+		if(phase == "train"):
+			print(phase.upper()+" pixels mean: "+str(np.mean(img.cpu().data.numpy()))+" pixels max "+str(np.max(img.cpu().data.numpy())))
+			print(phase.upper() + ' epoch ['+str(epoch+1)+'/'+str(num_epochs)+'], loss:'+str(loss.item()))
+		
 		if epoch % 10 == 0:
 			pic = to_img(output.cpu().data.numpy()[0])
 			input_pic = to_img(img.cpu().data.numpy()[0])
-			print(np.mean(pic), np.mean(input_pic)) # Input mean - 40, output mean - 0.14 (wait for it to learn and reduce input dim)
+			# print(np.mean(pic), np.mean(input_pic)) # Input mean - 40, output mean - 0.14 (wait for it to learn and reduce input dim)
 			cv2.imwrite('./dc_img/' + phase + '/image_{}.jpg'.format(epoch), pic)
 			cv2.imwrite('./dc_img/' + phase + '/image_{}_input.jpg'.format(epoch), input_pic)
 
