@@ -34,19 +34,19 @@ if not os.path.exists('./dc_img/test'):
 src  = [ "./data/harsh_train",  "./data/harsh_test"]
 
 
-num_epochs = 20
-batch_size = 128
-learning_rate = 1e-6
+num_epochs = 400
+batch_size = 64
+learning_rate = 1e-2
+NORM_VAL = 255
+
 data_transforms = {
     'train': transforms.Compose([
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
-        # transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
     ]),
     'test': transforms.Compose([
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
-        # transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
     ]),
 }
 data_dir = "./data"
@@ -62,7 +62,7 @@ for x in ["train","test"]:
 		my_img = scipy.misc.imresize(my_img, (240,360,3))
 		my_img = np.rollaxis(my_img,2,0)
 		my_img = my_img.astype(float)
-		img.append(my_img)
+		img.append(my_img/NORM_VAL)
 	img = np.asarray(img)
 	image_datasets[x] = img
 
@@ -89,20 +89,20 @@ class autoencoder(nn.Module):
 		self.blurring = nn.Conv2d(3,3,BLUR_FILTER_SIZE, padding=BLUR_FILTER_SIZE//2, bias=False)
 		self.blurring.weight = torch.nn.Parameter((torch.ones(BLUR_FILTER_SIZE,BLUR_FILTER_SIZE)*(1/(BLUR_FILTER_SIZE*BLUR_FILTER_SIZE))).expand(self.blurring.weight.size()), requires_grad=False)
 		self.encoder = nn.Sequential(
-			self.blurring,                                  # 720 x 480 x 3 => 720 x 480 x 3 - Blur effect
-			nn.Conv2d(3, 64, 3, stride=3, padding=0),       # 720 x 480 x 3 => 240 x 160 x 16
+			self.blurring,                                  # 360 x 240 => 360 x 240 - Blur effect
+			nn.Conv2d(3, 64, 3, stride=3, padding=0),       # 360 x 240 => 120 x 80 
 			nn.ReLU(True),
-			nn.MaxPool2d(2, stride=2),  					# 240 x 160 x 16 => 120 x 80 x 16
-			nn.Conv2d(64, 32, 4, stride=4, padding=0),  		# 120 x 80 x 16 => 30 x 20 x 8
+			nn.MaxPool2d(2, stride=2),  					# 120 x 80  => 60 x 40
+			nn.Conv2d(64, 128, 2, stride=2, padding=0),  		# 60 x 40 => 30 x 20
 			nn.ReLU(True),
 			# nn.MaxPool2d(2, stride=1)  # b, 8, 2, 2
 		)
 		self.decoder = nn.Sequential(
-			nn.ConvTranspose2d(32, 48, 4, stride=4),  		# 30 x 20 x 8 => 120 x 80 x 16
+			nn.ConvTranspose2d(128, 64, 2, stride=2),  		# 30 x 20 => 60 x 40
 			nn.ReLU(True),
-			nn.ConvTranspose2d(48, 64, 3, stride=3, padding=0),  # 120 x 80 x 16 => 360 x 240 x 8
+			nn.ConvTranspose2d(64, 64, 2, stride=2, padding=0),  # 60 x 40 => 120 x 80
 			nn.ReLU(True),
-			nn.ConvTranspose2d(64, 3, 2, stride=2, padding=0),  # 360 x 240 x 8 => 720 x 480 x 3
+			nn.ConvTranspose2d(64, 3, 3, stride=3, padding=0),  # 120 x 80 => 360 x 240
 			nn.Tanh()
 		)
 
@@ -132,12 +132,16 @@ optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate,
 
 for epoch in range(num_epochs):
 	for phase in ['train', 'test']:
+		cum_loss = []
+		tot = 0
 		for data in dataloaders[phase]:
 			img = data.float()
 			img = Variable(img).cuda()
 			# ===================forward=====================
 			output = model(img)
 			loss = criterion(output, img)
+			cum_loss.append(loss.item()*(data.size()[0]))
+			tot+=data.size()[0]
 			# ===================backward====================
 			if(phase == 'train'):
 				optimizer.zero_grad()
@@ -147,11 +151,11 @@ for epoch in range(num_epochs):
 		
 		if(phase == "train"):
 			print(phase.upper()+" pixels mean: "+str(np.mean(img.cpu().data.numpy()))+" pixels max "+str(np.max(img.cpu().data.numpy())))
-			print(phase.upper() + ' epoch ['+str(epoch+1)+'/'+str(num_epochs)+'], loss:'+str(loss.item()))
+			print(phase.upper() + ' epoch ['+str(epoch+1)+'/'+str(num_epochs)+'], loss:'+str(sum(cum_loss)/tot))
 		
 		if epoch % 10 == 0:
-			pic = to_img(output.cpu().data.numpy()[0])
-			input_pic = to_img(img.cpu().data.numpy()[0])
+			pic = to_img(output.cpu().data.numpy()[0]*NORM_VAL)
+			input_pic = to_img(img.cpu().data.numpy()[0]*NORM_VAL)
 			# print(np.mean(pic), np.mean(input_pic)) # Input mean - 40, output mean - 0.14 (wait for it to learn and reduce input dim)
 			cv2.imwrite('./dc_img/' + phase + '/image_{}.jpg'.format(epoch), pic)
 			cv2.imwrite('./dc_img/' + phase + '/image_{}_input.jpg'.format(epoch), input_pic)
