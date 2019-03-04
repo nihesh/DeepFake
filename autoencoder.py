@@ -7,6 +7,7 @@
 import torch
 import torchvision
 from torch import nn
+import torch.nn.functional as F
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from torchvision import transforms
@@ -23,7 +24,7 @@ import scipy.misc
 import time
 
 if not os.path.exists('./dc_img'):
-	os.mkdir('./dc_img')
+    os.mkdir('./dc_img')
 
 if not os.path.exists('./dc_img/train'):
 	os.mkdir('./dc_img/train')
@@ -84,48 +85,49 @@ def to_img(x):
     return x
 
 class autoencoder(nn.Module):
-	def __init__(self):
-		super(autoencoder, self).__init__()
-		self.blurring = nn.Conv2d(3,3,BLUR_FILTER_SIZE, padding=BLUR_FILTER_SIZE//2, bias=False)
-		self.blurring.weight = torch.nn.Parameter((torch.ones(BLUR_FILTER_SIZE,BLUR_FILTER_SIZE)*(1/(BLUR_FILTER_SIZE*BLUR_FILTER_SIZE))).expand(self.blurring.weight.size()), requires_grad=False)
-		self.encoder = nn.Sequential(
-			self.blurring,                                  # 360 x 240 => 360 x 240 - Blur effect
-			nn.Conv2d(3, 64, 3, stride=3, padding=0),       # 360 x 240 => 120 x 80 
-			nn.ReLU(True),
-			nn.MaxPool2d(2, stride=2),  					# 120 x 80  => 60 x 40
-			nn.Conv2d(64, 128, 2, stride=2, padding=0),  		# 60 x 40 => 30 x 20
-			nn.ReLU(True),
-			# nn.MaxPool2d(2, stride=1)  # b, 8, 2, 2
-		)
-		self.decoder = nn.Sequential(
-			nn.ConvTranspose2d(128, 64, 2, stride=2),  		# 30 x 20 => 60 x 40
-			nn.ReLU(True),
-			nn.ConvTranspose2d(64, 64, 2, stride=2, padding=0),  # 60 x 40 => 120 x 80
-			nn.ReLU(True),
-			nn.ConvTranspose2d(64, 3, 3, stride=3, padding=0),  # 120 x 80 => 360 x 240
-			nn.Tanh()
-		)
 
-	def forward(self, x):
-		x = self.encoder(x)
-		x = self.decoder(x)
-		return x
+    def __init__(self):
+        super(autoencoder, self).__init__()
+        self.blurring = nn.Conv2d(3,3,BLUR_FILTER_SIZE, padding=BLUR_FILTER_SIZE//2, bias=False)
+        self.blurring.weight = torch.nn.Parameter((torch.ones(BLUR_FILTER_SIZE,BLUR_FILTER_SIZE)*(1/(BLUR_FILTER_SIZE*BLUR_FILTER_SIZE))).expand(self.blurring.weight.size()), requires_grad=False)
+      
 
-class LinearBlur():
-	def __init__(self):
-		self.conv = nn.Conv2d(3,3,BLUR_FILTER_SIZE, padding=BLUR_FILTER_SIZE//2, bias=False)
-		self.conv.weight = torch.nn.Parameter((torch.ones(BLUR_FILTER_SIZE,BLUR_FILTER_SIZE)*(1/(BLUR_FILTER_SIZE*BLUR_FILTER_SIZE))).expand(self.conv.weight.size()), requires_grad=False)
-		self.linear_blur = nn.Sequential(
-			self.conv
-		)
+        self.conv1 = nn.Conv2d(3, 64, 3, stride=3, padding=0)       # 360 x 240 => 120 x 80 
+        self.conv2 = nn.Conv2d(64, 64, 3, stride=1, padding=1)       # 120 x 80 => 120 x 80
+        self.pool2 = nn.MaxPool2d(2, stride=2)                 	# 120 x 80  => 60 x 40
+        self.conv3 = nn.Conv2d(64, 512, 2, stride=2, padding=0)    # 60 x 40 => 30 x 20
+            
 
-	def forward(self, x):
-		x = self.linear_blur(x)
-		return x
+        self.deconv1 = nn.ConvTranspose2d(512, 64, 2, stride=2)  		# 30 x 20 => 60 x 40
+        self.deconv2 = nn.ConvTranspose2d(64, 64, 2, stride=2, padding=0)  # 60 x 40 => 120 x 80
+        self.deconv3 = nn.ConvTranspose2d(64, 64, 3, stride=1, padding=1)  # 120 x 80 => 120 x 80
+        self.deconv4 = nn.ConvTranspose2d(64, 3, 3, stride=3, padding=0)  # 120 x 80 => 360 x 240
 
+    def encoder(self, x):
+        
+        self.x0 = x             # Removed blurring
+        self.x1 = F.relu(self.conv1(self.x0))
+        self.x2 = F.relu(self.conv2(self.x1))
+        self.x3 = self.pool2(self.x2)
+        self.x4 = F.relu(self.conv3(self.x3))
+
+        return self.x4
+
+    def decoder(self, x):
+
+        x = F.relu(self.deconv1(x)) + self.x3 - self.x3   # skip connection
+        x = F.relu(self.deconv2(x)) + self.x2 -self.x2
+        x = F.relu(self.deconv3(x)) + self.x1 -self.x1
+        x = torch.tanh(self.deconv4(x))
+
+        return x
+
+    def forward(self, x):
+        x = self.encoder(x)
+        x = self.decoder(x)
+        return x
 
 model = autoencoder().cuda()
-blur = LinearBlur()
 criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate,
                              weight_decay=1e-5)
