@@ -36,10 +36,14 @@ def to_img(x):
 if not os.path.exists('./dc_img'):
     os.mkdir('./dc_img')
 
+os.system("rm -rf ./model")
+os.mkdir("./model")
+
 num_epochs = 40000
 batch_size = 64
-learning_rate = 1e-4
-OUTPUT_SAVE_RATE = 10       # Output is written to dc_img once in these many epochs
+learning_rate = [5e-4, 1e-4]
+OUTPUT_SAVE_RATE = 20       # Output is written to dc_img once in these many epochs
+MODEL_SAVE_RATE = 200
 
 data_dir = "./data/"
 
@@ -67,9 +71,10 @@ for epoch in range(num_epochs):
         for data in dataloaders[actor]:
             img = data.float()
             img = Variable(img).cuda()
-            
+                    
             # Forward pass
             output = model(img)
+            
             loss = criterion(output, img)
             cum_loss.append(loss.item()*(data.size()[0]))
             tot+=data.size()[0]
@@ -101,7 +106,8 @@ for epoch in range(num_epochs):
         output = to_img(output.cpu().data.numpy()[0]*255)
         
         cv2.imwrite("./dc_img/Output_nihesh"+str(epoch)+".jpg", output)   
-
+    
+    if((epoch+1)%MODEL_SAVE_RATE == 0):
+        torch.save(model.state_dict(), './model/conv_autoencoder-loss-'+str(round(sum(cum_loss)/tot,6))+'.pth')
+    
     print()
-	
-torch.save(model.state_dict(), './conv_autoencoder.pth')

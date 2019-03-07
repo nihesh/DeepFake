@@ -12,6 +12,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import scipy.misc
 
+IMAGE_SIZE = (256, 384) 
+
 class CustomDataset(Dataset):
 
     def __init__(self, path, mode):
@@ -33,7 +35,7 @@ class CustomDataset(Dataset):
         img = cv2.imread(file_path)
     
         # Resize image to reduce computation complexity
-        img = scipy.misc.imresize(img, (240,360,3))
+        img = scipy.misc.imresize(img, (IMAGE_SIZE[0],IMAGE_SIZE[1],3))
         
         img = np.rollaxis(img,2,0)
         img = img.astype(float)
