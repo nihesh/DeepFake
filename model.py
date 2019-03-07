@@ -70,17 +70,17 @@ class autoencoder(nn.Module):
         self.conv4 = nn.Conv2d(maps3, maps4, self.kernel, stride=self.stride, padding = pad_params[3])    
         dense_neurons = maps4 * self.img_dim[0] * self.img_dim[1]
         self.dense1 = nn.Linear(dense_neurons, dense_neurons//dense_compression)
-        # self.dense2 = nn.Linear(dense_neurons//dense_compression, dense_neurons)              
+        self.dense2 = nn.Linear(dense_neurons//dense_compression, dense_neurons)              
 
         self.encoding_layer.append(self.conv1)      
         self.encoding_layer.append(self.conv2)      
         self.encoding_layer.append(self.conv3)                 
         self.encoding_layer.append(self.conv4)    
         self.encoding_layer.append(self.dense1)
-        # self.encoding_layer.append(self.dense2)
+        self.encoding_layer.append(self.dense2)
     
         # Decoder werights for mode = 0, i.e, source
-        self.dense10 = nn.Linear(dense_neurons//dense_compression, dense_neurons)
+        # self.dense10 = nn.Linear(dense_neurons//dense_compression, dense_neurons)
         self.deconv10 = nn.ConvTranspose2d(maps4, maps3, self.kernel, stride=self.stride, padding = pad_params[3])
         self.deconv20 = nn.ConvTranspose2d(maps3, maps2, self.kernel, stride=self.stride, padding = pad_params[2])
         self.deconv30 = nn.ConvTranspose2d(maps2, maps1, self.kernel, stride=self.stride, padding = pad_params[1])
@@ -88,7 +88,7 @@ class autoencoder(nn.Module):
         # self.conv50 = nn.Conv2d(maps0, 3, 3, stride=1, padding=1)
 
         # Decoder weights for mode = 1, i.e, target
-        self.dense11 = nn.Linear(dense_neurons//dense_compression, dense_neurons)
+        # self.dense11 = nn.Linear(dense_neurons//dense_compression, dense_neurons)
         self.deconv11 = nn.ConvTranspose2d(maps4, maps3, self.kernel, stride=self.stride, padding = pad_params[3])
         self.deconv21 = nn.ConvTranspose2d(maps3, maps2, self.kernel, stride=self.stride, padding = pad_params[2])
         self.deconv31 = nn.ConvTranspose2d(maps2, maps1, self.kernel, stride=self.stride, padding = pad_params[1])
@@ -96,7 +96,7 @@ class autoencoder(nn.Module):
         # self.conv51 = nn.Conv2d(maps0, 3, 3, stride=1, padding=1)
 
         self.decoding_layer.append([])      
-        self.decoding_layer[-1].append(self.dense10)
+        # self.decoding_layer[-1].append(self.dense10)
         self.decoding_layer[-1].append(self.deconv10)
         self.decoding_layer[-1].append(self.deconv20)  
         self.decoding_layer[-1].append(self.deconv30)  
@@ -104,7 +104,7 @@ class autoencoder(nn.Module):
         # self.decoding_layer[-1].append(self.conv50)
 
         self.decoding_layer.append([])              
-        self.decoding_layer[-1].append(self.dense11) 
+        # self.decoding_layer[-1].append(self.dense11) 
         self.decoding_layer[-1].append(self.deconv11)                         
         self.decoding_layer[-1].append(self.deconv21)                                             
         self.decoding_layer[-1].append(self.deconv31)                                             
@@ -144,25 +144,25 @@ class autoencoder(nn.Module):
         # print("Conv 4:",self.x4.shape)
         self.x5 = F.leaky_relu(self.encoding_layer[4](self.x4.reshape((self.x4.shape[0], self.x4.numel()//self.x4.shape[0]))),self.neg_slope)
         # print("Dense 1:",self.x5.shape)    
-        # self.x6 = F.leaky_relu(self.encoding_layer[5](self.x5), self.neg_slope)
+        self.x6 = F.leaky_relu(self.encoding_layer[5](self.x5), self.neg_slope)
         # print("Dense 2:",self.x6.shape)
-        # self.x6 = self.x6.reshape(self.x4.shape) 
+        self.x6 = self.x6.reshape(self.x4.shape) 
         
-        return self.x5
+        return self.x6
 
     def decoder(self, x):
 
         if(self.mode):
             
-            x = F.leaky_relu(self.decoding_layer[1][0](x), self.neg_slope)
-            x = x.reshape(self.x4.shape)
-            x = F.leaky_relu(self.decoding_layer[1][1](x), self.neg_slope) # + self.x4    # skip connection (optional - mostly useless)
+            # x = F.leaky_relu(self.decoding_layer[1][0](x), self.neg_slope)
+            # x = x.reshape(self.x4.shape)
+            x = F.leaky_relu(self.decoding_layer[1][0](x), self.neg_slope) # + self.x4    # skip connection (optional - mostly useless)
             # print("Deconv 1:",x.shape)
-            x = F.leaky_relu(self.decoding_layer[1][2](x), self.neg_slope) # + self.x3 
+            x = F.leaky_relu(self.decoding_layer[1][1](x), self.neg_slope) # + self.x3 
             # print("Deconv 2:",x.shape)
-            x = F.leaky_relu(self.decoding_layer[1][3](x), self.neg_slope) # + self.x2 
+            x = F.leaky_relu(self.decoding_layer[1][2](x), self.neg_slope) # + self.x2 
             # print("Deconv 3:",x.shape)
-            x = F.leaky_relu(self.decoding_layer[1][4](x), self.neg_slope) # + self.x1 
+            x = F.leaky_relu(self.decoding_layer[1][3](x), self.neg_slope) # + self.x1 
             # print("Deconv 4:",x.shape)
             # x = F.leaky_relu(self.decoding_layer[1][4](x), self.neg_slope) 
             # print("Conv 5:",x.shape)
@@ -170,15 +170,15 @@ class autoencoder(nn.Module):
             
         else:
             
-            x = F.leaky_relu(self.decoding_layer[0][0](x), self.neg_slope)
-            x = x.reshape(self.x4.shape)
-            x = F.leaky_relu(self.decoding_layer[0][1](x), self.neg_slope) # + self.x4    # skip connection (optional - mostly useless)
+            # x = F.leaky_relu(self.decoding_layer[0][0](x), self.neg_slope)
+            # x = x.reshape(self.x4.shape)
+            x = F.leaky_relu(self.decoding_layer[0][0](x), self.neg_slope) # + self.x4    # skip connection (optional - mostly useless)
             # print("Deconv 1:",x.shape)
-            x = F.leaky_relu(self.decoding_layer[0][2](x), self.neg_slope) # + self.x3 
+            x = F.leaky_relu(self.decoding_layer[0][1](x), self.neg_slope) # + self.x3 
             # print("Deconv 2:",x.shape)
-            x = F.leaky_relu(self.decoding_layer[0][3](x), self.neg_slope) # + self.x2 
+            x = F.leaky_relu(self.decoding_layer[0][2](x), self.neg_slope) # + self.x2 
             # print("Deconv 3:",x.shape)
-            x = F.leaky_relu(self.decoding_layer[0][4](x), self.neg_slope) # + self.x1 
+            x = F.leaky_relu(self.decoding_layer[0][3](x), self.neg_slope) # + self.x1 
             # print("Deconv 4:",x.shape)
             # x = F.leaky_relu(self.decoding_layer[1][4](x), self.neg_slope) 
             # print("Conv 5:",x.shape)
