@@ -41,7 +41,7 @@ os.mkdir("./model")
 
 num_epochs = 40000
 batch_size = 64
-learning_rate = [5e-4, 1e-4]
+learning_rate = [2e-4, 1e-4]
 OUTPUT_SAVE_RATE = 20       # Output is written to dc_img once in these many epochs
 MODEL_SAVE_RATE = 200
 
