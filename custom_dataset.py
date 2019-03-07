@@ -31,9 +31,14 @@ class CustomDataset(Dataset):
 
         file_path = self.path + self.files[idx]
         img = cv2.imread(file_path)
+    
+        # Resize image to reduce computation complexity
         img = scipy.misc.imresize(img, (240,360,3))
+        
         img = np.rollaxis(img,2,0)
         img = img.astype(float)
+        
+        # Image normalisation
         img = img/255
 
         return img

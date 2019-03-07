@@ -38,7 +38,8 @@ if not os.path.exists('./dc_img'):
 
 num_epochs = 40000
 batch_size = 64
-learning_rate = 1e-3
+learning_rate = 1e-4
+OUTPUT_SAVE_RATE = 10       # Output is written to dc_img once in these many epochs
 
 data_dir = "./data/"
 
@@ -79,7 +80,7 @@ for epoch in range(num_epochs):
 
         print("ACTOR: "+str(actor) + ' Epoch ['+str(epoch+1)+'/'+str(num_epochs)+'], loss:'+str(sum(cum_loss)/tot))
 
-    if((epoch+1)%2 == 0):
+    if((epoch+1)%OUTPUT_SAVE_RATE == 0):
 
         # Load a random image of actor 0
         img = dataset[0][random.randint(0,len(dataset[0])-1)]
@@ -89,23 +90,17 @@ for epoch in range(num_epochs):
 
         output = model(torch.from_numpy(np.asarray([img])).float().cuda())
         output = to_img(output.cpu().data.numpy()[0]*255)
-        img = to_img(img*255)
-
-        cv2.imwrite("./dc_img/Input_nihesh"+str(epoch)+".jpg", img)
-        cv2.imwrite("./dc_img/Output_nihesh"+str(epoch)+".jpg", output)     
         
-        # Load a random image of actor 0
-        img = dataset[1][random.randint(0,len(dataset[1])-1)]
-
-        # Use decoder of actor 1
+        cv2.imwrite("./dc_img/Input_nihesh"+str(epoch)+".jpg", to_img(img*255))
+        cv2.imwrite("./dc_img/Output_harsh"+str(epoch)+".jpg", output)     
+        
+        # Use decoder of actor 0
         model.setMode(0)
 
         output = model(torch.from_numpy(np.asarray([img])).float().cuda())
         output = to_img(output.cpu().data.numpy()[0]*255)
-        img = to_img(img*255)
-
-        cv2.imwrite("./dc_img/Input_harsh"+str(epoch)+".jpg", img)
-        cv2.imwrite("./dc_img/Output_harsh"+str(epoch)+".jpg", output)   
+        
+        cv2.imwrite("./dc_img/Output_nihesh"+str(epoch)+".jpg", output)   
 
     print()
 	

@@ -29,32 +29,37 @@ class autoencoder(nn.Module):
        
         self.mode = 1       # 1 corresponds to target sample      
 
-        maps1 = 10
-        maps2 = 12
-        maps3 = 50
-
+        maps1 = 27      # SOTA = 15
+        maps2 = 27      # SOTA = 18
+        maps3 = 50      # SOTA = 75
+        maps4 = 75
+        dense_compression = 30
         self.encoding_layer = []
         self.decoding_layer = []        
         
         self.conv1 = nn.Conv2d(3, maps1, 3, stride=3, padding=0)       # 360 x 240 => 120 x 80 
         self.conv2 = nn.Conv2d(maps1, maps2, 3, stride=1, padding=1)       # 120 x 80 => 120 x 80
-        self.pool2 = nn.MaxPool2d(2, stride=2)                  # 120 x 80  => 60 x 40
-        self.conv3 = nn.Conv2d(maps2, maps3, 2, stride=2, padding=0)    # 60 x 40 => 30 x 20
+        self.conv3 = nn.Conv2d(maps2, maps3, 2, stride=2)                  # 120 x 80  => 60 x 40
+        self.conv4 = nn.Conv2d(maps3, maps4, 2, stride=2, padding=0)    # 60 x 40 => 30 x 20
+        self.dense1 = nn.Linear(maps4*30*20, maps4*30*20//dense_compression)
+        self.dense2 = nn.Linear(maps4*30*20//dense_compression, maps4*30*20)        
 
         self.encoding_layer.append(self.conv1)      
         self.encoding_layer.append(self.conv2)      
-        self.encoding_layer.append(self.pool2)                 
-        self.encoding_layer.append(self.conv3)    
+        self.encoding_layer.append(self.conv3)                 
+        self.encoding_layer.append(self.conv4)    
+        self.encoding_layer.append(self.dense1)
+        self.encoding_layer.append(self.dense2)
             
         # Decoder werights for mode = 0, i.e, source
-        self.deconv10 = nn.ConvTranspose2d(maps3, maps2, 2, stride=2)        # 30 x 20 => 60 x 40
-        self.deconv20 = nn.ConvTranspose2d(maps2, maps2, 2, stride=2, padding=0)  # 60 x 40 => 120 x 80
+        self.deconv10 = nn.ConvTranspose2d(maps4, maps3, 2, stride=2)        # 30 x 20 => 60 x 40
+        self.deconv20 = nn.ConvTranspose2d(maps3, maps2, 2, stride=2, padding=0)  # 60 x 40 => 120 x 80
         self.deconv30 = nn.ConvTranspose2d(maps2, maps1, 3, stride=1, padding=1)  # 120 x 80 => 120 x 80
         self.deconv40 = nn.ConvTranspose2d(maps1, 3, 3, stride=3, padding=0)  # 120 x 80 => 360 x 240
             
         # Decoder weights for mode = 1, i.e, target
-        self.deconv11 = nn.ConvTranspose2d(maps3, maps2, 2, stride=2)        # 30 x 20 => 60 x 40
-        self.deconv21 = nn.ConvTranspose2d(maps2, maps2, 2, stride=2, padding=0)  # 60 x 40 => 120 x 80
+        self.deconv11 = nn.ConvTranspose2d(maps4, maps3, 2, stride=2)        # 30 x 20 => 60 x 40
+        self.deconv21 = nn.ConvTranspose2d(maps3, maps2, 2, stride=2, padding=0)  # 60 x 40 => 120 x 80
         self.deconv31 = nn.ConvTranspose2d(maps2, maps1, 3, stride=1, padding=1)  # 120 x 80 => 120 x 80
         self.deconv41 = nn.ConvTranspose2d(maps1, 3, 3, stride=3, padding=0)  # 120 x 80 => 360 x 240
 
@@ -96,21 +101,23 @@ class autoencoder(nn.Module):
         self.x2 = F.relu(self.encoding_layer[1](self.x1))
         self.x3 = self.encoding_layer[2](self.x2)
         self.x4 = F.relu(self.encoding_layer[3](self.x3))
+        self.x5 = F.relu(self.encoding_layer[4](self.x4.reshape((self.x4.shape[0], self.x4.numel()//self.x4.shape[0]))))
+        self.x6 = F.relu(self.encoding_layer[5](self.x5))
 
-        return self.x4
+        return self.x6.reshape(self.x4.shape)
 
     def decoder(self, x):
 
         if(self.mode):
 
-            x = F.relu(self.decoding_layer[1][0](x)) # + self.x3    # skip connection (optional)
+            x = F.relu(self.decoding_layer[1][0](x)) # + self.x3    # skip connection (optional - mostly useless)
             x = F.relu(self.decoding_layer[1][1](x)) # + self.x2 
             x = F.relu(self.decoding_layer[1][2](x)) # + self.x1 
             x = torch.tanh(self.decoding_layer[1][3](x))
             
         else:
 
-            x = F.relu(self.decoding_layer[0][0](x)) # + self.x3    # skip connection (optional)
+            x = F.relu(self.decoding_layer[0][0](x)) # + self.x3    # skip connection (optional - mostly useless)
             x = F.relu(self.decoding_layer[0][1](x)) # + self.x2 
             x = F.relu(self.decoding_layer[0][2](x)) # + self.x1 
             x = torch.tanh(self.decoding_layer[0][3](x))            
