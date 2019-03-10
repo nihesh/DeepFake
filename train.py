@@ -41,7 +41,7 @@ os.mkdir("./model")
 
 num_epochs = 40000
 batch_size = 64
-learning_rate = [2e-4, 1e-4]
+learning_rate = [1e-3, 1e-3]
 OUTPUT_SAVE_RATE = 20       # Output is written to dc_img once in these many epochs
 MODEL_SAVE_RATE = 200
 
@@ -68,16 +68,19 @@ for epoch in range(num_epochs):
         tot = 0
         model.setMode(actor)
         
-        for data in dataloaders[actor]:
-            img = data.float()
+        for warped, original in dataloaders[actor]:
+            img = warped.float()
             img = Variable(img).cuda()
+
+            original = original.float()
+            original = Variable(original).cuda()
                     
             # Forward pass
             output = model(img)
             
-            loss = criterion(output, img)
-            cum_loss.append(loss.item()*(data.size()[0]))
-            tot+=data.size()[0]
+            loss = criterion(output, original)
+            cum_loss.append(loss.item()*(warped.size()[0]))
+            tot+=warped.size()[0]
             
             # Backpropagation
             loss.backward()
@@ -88,8 +91,8 @@ for epoch in range(num_epochs):
     if((epoch+1)%OUTPUT_SAVE_RATE == 0):
 
         # Load a random image of actor 0
-        img = dataset[0][random.randint(0,len(dataset[0])-1)]
-        
+        warped, img = dataset[0][random.randint(0,len(dataset[0])-1)]
+             
         # Use decoder of actor 1
         model.setMode(1)
 
@@ -97,6 +100,7 @@ for epoch in range(num_epochs):
         output = to_img(output.cpu().data.numpy()[0]*255)
         
         cv2.imwrite("./dc_img/Input_nihesh"+str(epoch)+".jpg", to_img(img*255))
+        cv2.imwrite("./dc_img/Input_nihesh_warped"+str(epoch)+".jpg", to_img(warped*255))
         cv2.imwrite("./dc_img/Output_harsh"+str(epoch)+".jpg", output)     
         
         # Use decoder of actor 0
