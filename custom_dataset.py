@@ -15,7 +15,8 @@ import cv2
 import random
 from skimage.transform import swirl
 
-IMAGE_SIZE = (128, 192) 
+# IMAGE_SIZE = (128, 192) 
+IMAGE_SIZE = (160, 160)
 WARP_PROB = 0.9
 
 class CustomDataset(Dataset):
@@ -23,7 +24,7 @@ class CustomDataset(Dataset):
     def __init__(self, path, mode):
 
         self.ROOT = path
-        self.ACTORS = ["nihesh", "harsh"]
+        self.ACTORS = ["obama", "trump"]
         
         self.path = self.ROOT + self.ACTORS[mode] + "_train/"
 
