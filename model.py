@@ -45,11 +45,11 @@ class autoencoder(nn.Module):
 
         # Architecture parameters
         maps0 = 3   # Initially 12, when last conv layer is active
-        maps1 = 20      
-        maps2 = 34     
-        maps3 = 50     
-        maps4 = 80
-        dense_compression = 10
+        maps1 = 10      
+        maps2 = 25     
+        maps3 = 63     
+        maps4 = 120
+        dense_compression = 2
         self.neg_slope = 0.1        # slope value for leaky_relu
         self.kernel = 4
         self.stride = 2
@@ -156,13 +156,13 @@ class autoencoder(nn.Module):
             
             # x = F.leaky_relu(self.decoding_layer[1][0](x), self.neg_slope)
             # x = x.reshape(self.x4.shape)
-            x = F.leaky_relu(self.decoding_layer[1][0](x), self.neg_slope) # + self.x4    # skip connection (optional - mostly useless)
+            x = F.leaky_relu(self.decoding_layer[1][0](x), self.neg_slope) # + self.x3    # skip connection (optional - mostly useless)
             # print("Deconv 1:",x.shape)
-            x = F.leaky_relu(self.decoding_layer[1][1](x), self.neg_slope) # + self.x3 
+            x = F.leaky_relu(self.decoding_layer[1][1](x), self.neg_slope) # + self.x2 
             # print("Deconv 2:",x.shape)
-            x = F.leaky_relu(self.decoding_layer[1][2](x), self.neg_slope) # + self.x2 
+            x = F.leaky_relu(self.decoding_layer[1][2](x), self.neg_slope) # + self.x1 
             # print("Deconv 3:",x.shape)
-            x = F.leaky_relu(self.decoding_layer[1][3](x), self.neg_slope) # + self.x1 
+            x = F.leaky_relu(self.decoding_layer[1][3](x), self.neg_slope)  
             # print("Deconv 4:",x.shape)
             # x = F.leaky_relu(self.decoding_layer[1][4](x), self.neg_slope) 
             # print("Conv 5:",x.shape)
@@ -172,13 +172,13 @@ class autoencoder(nn.Module):
             
             # x = F.leaky_relu(self.decoding_layer[0][0](x), self.neg_slope)
             # x = x.reshape(self.x4.shape)
-            x = F.leaky_relu(self.decoding_layer[0][0](x), self.neg_slope) # + self.x4    # skip connection (optional - mostly useless)
+            x = F.leaky_relu(self.decoding_layer[0][0](x), self.neg_slope) # + self.x3    # skip connection (optional - mostly useless)
             # print("Deconv 1:",x.shape)
-            x = F.leaky_relu(self.decoding_layer[0][1](x), self.neg_slope) # + self.x3 
+            x = F.leaky_relu(self.decoding_layer[0][1](x), self.neg_slope) # + self.x2 
             # print("Deconv 2:",x.shape)
-            x = F.leaky_relu(self.decoding_layer[0][2](x), self.neg_slope) # + self.x2 
+            x = F.leaky_relu(self.decoding_layer[0][2](x), self.neg_slope) # + self.x1 
             # print("Deconv 3:",x.shape)
-            x = F.leaky_relu(self.decoding_layer[0][3](x), self.neg_slope) # + self.x1 
+            x = F.leaky_relu(self.decoding_layer[0][3](x), self.neg_slope)  
             # print("Deconv 4:",x.shape)
             # x = F.leaky_relu(self.decoding_layer[1][4](x), self.neg_slope) 
             # print("Conv 5:",x.shape)
